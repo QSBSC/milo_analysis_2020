@@ -17,7 +17,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
 bioc_pkgs <- setdiff(
-            c("SingleCellExperiment","scater","scran"),
+            c("SingleCellExperiment","scater","scran","Seurat"),
             installed.packages()[,1]
         )
 
@@ -64,8 +64,8 @@ suppressPackageStartupMessages({
 We downloaded the dataset and annotations stored in Seurat object from [here](https://datashare.is.ed.ac.uk/handle/10283/3433), as indicated by the authors.
 
 ```{r}
-load("/nfs/team205/ed6/data/Ramachandran2019_liver/tissue.rdata")
-
+# load("/nfs/team205/ed6/data/Ramachandran2019_liver/tissue.rdata")
+load(url("https://www.dropbox.com/s/bq816h74gmh84gu/tissue.rdata?dl=1"))
 ## Convert to SingleCellExperiment
 liver_sce <- SingleCellExperiment(assay = list(counts=tissue@raw.data, logcounts=tissue@data),
                                   colData = tissue@meta.data)
@@ -105,9 +105,10 @@ scater::plotUMAP(liver_sce, colour_by="annotation_lineage", point_alpha=0.3,  po
 
 Notably, this dataset doesn't appear to display a batch effect
 
-```{r}
-saveRDS(liver_sce, "~/mount/gdrive/milo/liver_SCE_20210225.RDS")
-liver_sce <- readRDS("~/mount/gdrive/milo/liver_SCE_20210225.RDS")
+### Note: This step is not required. It generates a large file (even larger than raw data) and then reloads it. 
+```{r save-load intermed file 1, eval=FALSE, include=TRUE, echo=TRUE}
+saveRDS(liver_sce, "~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_SCE_20210225.RDS")
+liver_sce <- readRDS(url("https://www.dropbox.com/s/z0aopf616b1urvj/liver_SCE_20210225.RDS?dl=1"))
 ```
 
 ## Differential Abundance analysis with Milo
@@ -131,7 +132,7 @@ Then we make a design matrix for the differential test, assigning samples to bio
 colData(liver_milo)[['sort']] <- str_remove(colData(liver_milo)[['dataset']], ".+_")
 colData(liver_milo)[['sort']] <- str_remove(colData(liver_milo)[['sort']], "A|B")
 
-liver_meta <- as.tibble(colData(liver_milo)[,c("dataset","condition", 'sort')])
+liver_meta <- as_tibble(colData(liver_milo)[,c("dataset","condition", 'sort')])
 liver_meta <- distinct(liver_meta) %>%
   mutate(condition=factor(condition, levels=c("Uninjured", "Cirrhotic"))) %>%
   column_to_rownames("dataset")
@@ -144,7 +145,8 @@ Now we can count cells in neighbourhoods and perform the DA test.
 liver_milo <- countCells(liver_milo, samples = "dataset", meta.data = data.frame(colData(liver_milo)[,c("dataset","condition",'sort')]) )
 liver_milo <- calcNhoodDistance(liver_milo, d=11)
 milo_res <- testNhoods(liver_milo, design = ~ condition, design.df = liver_meta[colnames(nhoodCounts(liver_milo)),])
-milo_res_sort <- testNhoods(liver_milo, design = ~ sort + condition, design.df = liver_meta[colnames(nhoodCounts(liver_milo)),])
+milo_res_sort <- testNhoods(liver_milo, design = ~ sort + condition, design.df = 
+                                liver_meta[colnames(nhoodCounts(liver_milo)),])
 ```
 
 ```{r}
@@ -189,20 +191,30 @@ liver_milo <- buildNhoodGraph(liver_milo)
 plotNhoodGraphDA(liver_milo, milo_res, alpha = 0.1, size_range=c(2,6))
 ```
 
-```{r}
+### Note: This step is not required. It generates a large file (even larger than raw data) and then reloads it. 
+```{r save intermed files 2, eval=FALSE, include=TRUE, echo=TRUE}
 ## Save milo object and results
-saveRDS(liver_milo,"/nfs/team205/ed6/data/Ramachandran2019_liver/liver_milo_20210225.RDS")
-write_csv(milo_res,"/nfs/team205/ed6/data/Ramachandran2019_liver/liver_results_20210225.csv")
+saveRDS(liver_milo,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_milo_20210225.RDS")
+write_csv(milo_res,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_results_20210225.csv")
+
+```
+```{r load intermed files 2, eval=FALSE, include=TRUE, echo=TRUE}
+# liver_milo <- readRDS("~/liver_milo_20201008.RDS")
+liver_milo <- readRDS(url("https://www.dropbox.com/s/xdp07789c5hoen3/liver_milo_20210225.RDS?dl=1"))
+# milo_res <- read_csv("/nfs/team205/ed6/data/Ramachandran2019_liver/liver_results_20201008.csv")
+milo_res <- read_csv(url("https://www.dropbox.com/s/i1l3aep1py5wirf/liver_results_20210225.csv?dl=1"))
 ```
 
+### NOTE: `hvgs` (presumably highly variable genes) cannot be loaded since file not provided
 ```{r}
-liver_milo <- readRDS("~/liver_milo_20201008.RDS")
-milo_res <- read_csv("/nfs/team205/ed6/data/Ramachandran2019_liver/liver_results_20201008.csv")
-
 ## Load hvgs 
 hvgs <- scan("~/data/Ramachandran2019_liver/liver_milo_hvgs.txt", "")
 ```
 
+### Attempting to generate a set of highly variable genes
+```{r}
+#
+```
 
 Making figures for the manuscript
 
@@ -246,7 +258,8 @@ nh_graph_pl <- plotNhoodGraphDA(liver_milo, milo_res, alpha = 0.1, size_range=c(
   theme(legend.text = element_text(size=20), legend.title = element_text(size=22)) +
   coord_fixed()
 
-nh_graph_pl + ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_graph.pdf", height = 7, width = 8)
+# nh_graph_pl + ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_graph.pdf", height = 7, width = 8)
+ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_graph.pdf", height = 7, width = 8)
 
 fig4_top <- (umap1 | umap2 | nh_graph_pl) +
   plot_layout(widths = c(3,1,3))
@@ -360,8 +373,8 @@ pl2 <- milo_res %>%
 fig4_bleft <- (pl2 + pl1 +
   plot_layout(widths=c(1,10), guides = "collect") & theme(legend.position = 'top', legend.justification = 0))
 
-fig4_bleft +
-  ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
+# ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
+ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
 ```
 
 ### Close-up on Endothelial lineage
@@ -496,7 +509,7 @@ chol_gr <-
                 )
 # fig4_bright1 +
 #   ggsave("~/milo_output/liver_endoGraph.pdf", width=9, height = 5)  
-
+ggsave("~/dropbox-vu/temp/milo_output/liver_endoGraph.pdf", width=9, height = 5)  
 ```
 
 ### Differential Gene Expression analysis
@@ -544,6 +557,11 @@ In a subset of lineages, we want to test for differential expression between nei
 <!-- } -->
 
 <!-- ``` -->
+
+## NOTE: Code below here won't work unless `hvgs` is defined
+### DRT: stopping run-through here
+Should be able to run everything above.
+----
 
 Add nhood expression to speed-up plotting of heatmaps
 
