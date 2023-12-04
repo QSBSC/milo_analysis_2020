@@ -11,53 +11,49 @@ In this notebook we demonstrate how to use Milo to detect abherrant cell states 
 
 ## Installation
 #### Added by DRT 2021-12-03
-
+#### Updated by DRT 2023-11-29
 ```{r Installation}
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
+source("getReqdPkgs.r")
 
-bioc_pkgs <- setdiff(
-            c("SingleCellExperiment","scater","scran","Seurat"),
-            installed.packages()[,1]
-        )
+pkgs <- c("SingleCellExperiment","scater","scran","Seurat","miloR",
+  "tidyverse","patchwork","igraph","ggplot2",
+  "ggrastr","msigdbr","clusterProfiler",
+  "RColorBrewer","cowplot","devtools")
 
-BiocManager::install(bioc_pkgs)
+extra_pkgs <- c("irlba","Matrix") # NOTE these must be installed from source to make code work; see next code block
 
-getPackageIfNeeded <- function(pkg) {
-  if (!require(pkg, character.only=TRUE))
-    install.packages(pkgs=pkg, dependencies=TRUE)
-}
-
-# determine missing R libraries
-pkgs <- setdiff(
-            c("tidyverse","miloR","patchwork","igraph",
-              "RColorBrewer","cowplot","devtools"),
-            installed.packages()[,1]
-        )
-
-invisible(sapply(pkgs,getPackageIfNeeded))
-
-if(!require(c("miloR"), character.only=TRUE)) devtools::install_github("MarioniLab/miloR")
+invisible(getReqdPkgs(pkgs))
 ```
 
+
+### NOTE
+As of 2023-11-29, the runPCA function in scater breaks due to change in Matrix library; must downgrade to Matrix 1.6.1
+Downloaded v 1.6.1 from https://cran.r-project.org/src/contrib/Archive/Matrix/  
+
+See this link: https://github.com/bwlewis/irlba/issues/70
 
 ```{r}
-# devtools::install_github("MarioniLab/miloR")
-suppressPackageStartupMessages({
-  library(tidyverse)
-  # library(irlba)
-  # library(DropletUtils)
-  library(scater)
-  library(scran)
-  # library(Seurat) ## just 4 loading the object
-  library(miloR)
-  library(SingleCellExperiment)
-  library(patchwork)
-  library(igraph)
-  library(RColorBrewer)
-  library(cowplot)
-  })
+# install.packages("Matrix", type = "source")
+# install.packages("irlba", type = "source")
 ```
+
+```{r}
+library(SingleCellExperiment)
+library(scater)
+library(scran)
+library(miloR)
+library(tidyverse)
+library(patchwork)
+library(igraph)
+library(ggplot2)
+library(ggrastr)
+library(msigdbr)
+library(cowplot)
+library(Matrix)
+library(irlba)
+library(RColorBrewer)
+```
+
 
 ## Load data
 
@@ -107,8 +103,8 @@ Notably, this dataset doesn't appear to display a batch effect
 
 ### Note: This step is not required. It generates a large file (even larger than raw data) and then reloads it. 
 ```{r save-load intermed file 1, eval=FALSE, include=TRUE, echo=TRUE}
-saveRDS(liver_sce, "~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_SCE_20210225.RDS")
-liver_sce <- readRDS(url("https://www.dropbox.com/s/z0aopf616b1urvj/liver_SCE_20210225.RDS?dl=1"))
+# saveRDS(liver_sce, "~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_SCE_20210225.RDS")
+# liver_sce <- readRDS(url("https://www.dropbox.com/s/z0aopf616b1urvj/liver_SCE_20210225.RDS?dl=1"))
 ```
 
 ## Differential Abundance analysis with Milo
@@ -194,8 +190,8 @@ plotNhoodGraphDA(liver_milo, milo_res, alpha = 0.1, size_range=c(2,6))
 ### Note: This step is not required. It generates a large file (even larger than raw data) and then reloads it. 
 ```{r save intermed files 2, eval=FALSE, include=TRUE, echo=TRUE}
 ## Save milo object and results
-saveRDS(liver_milo,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_milo_20210225.RDS")
-write_csv(milo_res,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_results_20210225.csv")
+# saveRDS(liver_milo,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_milo_20210225.RDS")
+# write_csv(milo_res,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_results_20210225.csv")
 
 ```
 ```{r load intermed files 2, eval=FALSE, include=TRUE, echo=TRUE}
@@ -208,7 +204,7 @@ milo_res <- read_csv(url("https://www.dropbox.com/s/i1l3aep1py5wirf/liver_result
 ### NOTE: `hvgs` (presumably highly variable genes) cannot be loaded since file not provided
 ```{r}
 ## Load hvgs 
-hvgs <- scan("~/data/Ramachandran2019_liver/liver_milo_hvgs.txt", "")
+# hvgs <- scan("~/data/Ramachandran2019_liver/liver_milo_hvgs.txt", "")
 ```
 
 ### Attempting to generate a set of highly variable genes
@@ -219,7 +215,7 @@ hvgs <- scan("~/data/Ramachandran2019_liver/liver_milo_hvgs.txt", "")
 Making figures for the manuscript
 
 ```{r, fig.width=15, fig.height=10}
-library(ggrastr)
+
 colourCount = length(unique(liver_milo$annotation_lineage))
 getPalette = colorRampPalette(brewer.pal(9, "Set2"))
 
@@ -240,6 +236,8 @@ umap1 <- cbind(umap_df, annotation_lineage=liver_milo$annotation_lineage) %>%
   coord_fixed() +
   theme_classic(base_size = 22) +
   theme(axis.text = element_blank(), axis.ticks = element_blank())
+ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_umap1_new.pdf", height = 7, width = 8)
+
 
 umap2 <-
   cbind(umap_df, condition=as.character(liver_milo$condition)) %>%
@@ -253,14 +251,22 @@ umap2 <-
   theme_nothing(font_size = 22) +
   theme(axis.text = element_blank(), axis.ticks = element_blank(), legend.position=c(0.9,0.9),
         strip.background = element_rect(color=NA), strip.text = element_text(size=22))
+ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_umap2_new.pdf", height = 7, width = 8)
+
 
 nh_graph_pl <- plotNhoodGraphDA(liver_milo, milo_res, alpha = 0.1, size_range=c(1,4)) +
   theme(legend.text = element_text(size=20), legend.title = element_text(size=22)) +
   coord_fixed()
 
 # nh_graph_pl + ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_graph.pdf", height = 7, width = 8)
-ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_graph.pdf", height = 7, width = 8)
+# ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_graph.pdf", height = 7, width = 8)
 
+ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_graph_new.pdf", height = 7, width = 8)
+
+```
+
+
+```{r , fig.width=15, fig.height=10}
 fig4_top <- (umap1 | umap2 | nh_graph_pl) +
   plot_layout(widths = c(3,1,3))
 
@@ -374,8 +380,12 @@ fig4_bleft <- (pl2 + pl1 +
   plot_layout(widths=c(1,10), guides = "collect") & theme(legend.position = 'top', legend.justification = 0))
 
 # ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
-ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
+# ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
 ```
+```{r fig.width=10, fig.height=10}
+pl2
+```
+
 
 ### Close-up on Endothelial lineage
 
@@ -509,7 +519,8 @@ chol_gr <-
                 )
 # fig4_bright1 +
 #   ggsave("~/milo_output/liver_endoGraph.pdf", width=9, height = 5)  
-ggsave("~/dropbox-vu/temp/milo_output/liver_endoGraph.pdf", width=9, height = 5)  
+
+# ggsave("~/dropbox-vu/temp/milo_output/liver_endoGraph.pdf", width=9, height = 5)  
 ```
 
 ### Differential Gene Expression analysis
@@ -588,7 +599,7 @@ p2 <- plotDAbeeswarm(milo_res_endogroups, group.by = 'NhoodGroup') +
 
 
 ## Plot expression in T cell neighbourhoods
-markers_df <- read_csv("~/mount/gdrive/milo/STable3_Ramachandran.csv")
+# markers_df <- read_csv("~/mount/gdrive/milo/STable3_Ramachandran.csv")
 tcell_marker_genes <- 
   markers_df %>%
   filter(cluster %in% c("Tcell", "ILC")) %>%
@@ -611,8 +622,8 @@ p3 <- plotNhoodExpressionGroups(liver_milo, milo_res_endogroups, features = uniq
     )) + 
   plot_layout(widths = c(1.4, 1)) +
   plot_annotation(tag_levels = c("A", "C", "B") ) +
-  ggsave("~/mount/gdrive/milo/Figures/liver_v2/RFig_grouping.pdf", width=15, height = 12) +
-  ggsave("~/mount/gdrive/milo/Figures/liver_v2/RFig_grouping.png", width=15, height = 12)
+  # ggsave("~/mount/gdrive/milo/Figures/liver_v2/RFig_grouping.pdf", width=15, height = 12) +
+  # ggsave("~/mount/gdrive/milo/Figures/liver_v2/RFig_grouping.png", width=15, height = 12)
 ```
 
 Group endothelial cells by logFC and DA results
