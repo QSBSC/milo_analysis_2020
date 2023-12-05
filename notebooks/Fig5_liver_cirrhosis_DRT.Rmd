@@ -30,15 +30,16 @@ invisible(getReqdPkgs(pkgs))
 As of 2023-11-29, the runPCA function in scater breaks due to change in Matrix library; must downgrade to Matrix 1.6.1
 Downloaded v 1.6.1 from https://cran.r-project.org/src/contrib/Archive/Matrix/  
 
+installing from source (compiling on your computer, rather than installing from a binary) may also be needed. On a Mac, this requires gfortran to be installed.  See [here](https://mac.r-project.org/tools/) and [link to download gfortran 12.2](https://mac.r-project.org/tools/gfortran-12.2-universal.pkg)  
+
 See this link: https://github.com/bwlewis/irlba/issues/70
 
 ```{r}
-# install.packages("Matrix", type = "source")
 # install.packages("irlba", type = "source")
+# install.packages("Matrix", type = "source") # , version="1.6.1"
 ```
 
 ```{r}
-library(SingleCellExperiment)
 library(scater)
 library(scran)
 library(miloR)
@@ -52,6 +53,13 @@ library(cowplot)
 library(Matrix)
 library(irlba)
 library(RColorBrewer)
+library(SingleCellExperiment)
+```
+## Define some global variables
+Location to save output files and whether to overwrite output files.
+```{r}
+OUTPUT_DIR <- "~/dropbox-vu/temp/milo_output"
+OVERWRITE <- FALSE
 ```
 
 
@@ -77,7 +85,7 @@ We use the same number of highly variable genes and principal components used by
 
 Select highly variable genes
 
-```{r}
+```{r Select hvgs}
 dec_liver <- modelGeneVar(liver_sce)
 
 fit_liver <- metadata(dec_liver)
@@ -107,7 +115,7 @@ Notably, this dataset doesn't appear to display a batch effect
 # liver_sce <- readRDS(url("https://www.dropbox.com/s/z0aopf616b1urvj/liver_SCE_20210225.RDS?dl=1"))
 ```
 
-## Differential Abundance analysis with Milo
+## Differential Abundance (DA) analysis with Milo
 
 We test for differential abundance between healthy and cirrhotic livers. We start by defining neighbourhoods with refined sampling on the KNN graph. We inspect the size of neighbourhoods.
 
@@ -135,8 +143,9 @@ liver_meta <- distinct(liver_meta) %>%
 
 ```
 
-Now we can count cells in neighbourhoods and perform the DA test.
+Now we can count cells in neighbourhoods and perform the DA test.  
 
+NOTE: Executing `calcNhoodDistance()` function takes a long time (>30 min)
 ```{r}
 liver_milo <- countCells(liver_milo, samples = "dataset", meta.data = data.frame(colData(liver_milo)[,c("dataset","condition",'sort')]) )
 liver_milo <- calcNhoodDistance(liver_milo, d=11)
@@ -194,6 +203,7 @@ plotNhoodGraphDA(liver_milo, milo_res, alpha = 0.1, size_range=c(2,6))
 # write_csv(milo_res,"~/dropbox-vu/temp/milo_data/Ramachandran2019_liver/liver_results_20210225.csv")
 
 ```
+
 ```{r load intermed files 2, eval=FALSE, include=TRUE, echo=TRUE}
 # liver_milo <- readRDS("~/liver_milo_20201008.RDS")
 liver_milo <- readRDS(url("https://www.dropbox.com/s/xdp07789c5hoen3/liver_milo_20210225.RDS?dl=1"))
@@ -201,18 +211,8 @@ liver_milo <- readRDS(url("https://www.dropbox.com/s/xdp07789c5hoen3/liver_milo_
 milo_res <- read_csv(url("https://www.dropbox.com/s/i1l3aep1py5wirf/liver_results_20210225.csv?dl=1"))
 ```
 
-### NOTE: `hvgs` (presumably highly variable genes) cannot be loaded since file not provided
-```{r}
-## Load hvgs 
-# hvgs <- scan("~/data/Ramachandran2019_liver/liver_milo_hvgs.txt", "")
-```
 
-### Attempting to generate a set of highly variable genes
-```{r}
-#
-```
-
-Making figures for the manuscript
+### Making figures for the manuscript
 
 ```{r, fig.width=15, fig.height=10}
 
@@ -236,7 +236,14 @@ umap1 <- cbind(umap_df, annotation_lineage=liver_milo$annotation_lineage) %>%
   coord_fixed() +
   theme_classic(base_size = 22) +
   theme(axis.text = element_blank(), axis.ticks = element_blank())
-ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_umap1_new.pdf", height = 7, width = 8)
+
+fn_liver_umap1 <- file.path(OUTPUT_DIR,"/liver_v2/liver_umap1_new.pdf")
+
+if(OVERWRITE | !file.exists(fn_liver_umap1)) {
+  ggsave(fn_liver_umap1, height = 7, width = 8)
+} else {
+  message(cat(fn_liver_umap1,"exists and will not be overwritten\n"))
+}
 
 
 umap2 <-
@@ -251,17 +258,27 @@ umap2 <-
   theme_nothing(font_size = 22) +
   theme(axis.text = element_blank(), axis.ticks = element_blank(), legend.position=c(0.9,0.9),
         strip.background = element_rect(color=NA), strip.text = element_text(size=22))
-ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_umap2_new.pdf", height = 7, width = 8)
 
+
+fn_liver_umap2 <- file.path(OUTPUT_DIR,"/liver_v2/liver_umap2_new.pdf")
+
+if(OVERWRITE | !file.exists(fn_liver_umap1)) {
+  ggsave(fn_liver_umap2, height = 7, width = 8)
+} else {
+  message(cat(fn_liver_umap2,"exists and will not be overwritten\n"))
+}
 
 nh_graph_pl <- plotNhoodGraphDA(liver_milo, milo_res, alpha = 0.1, size_range=c(1,4)) +
   theme(legend.text = element_text(size=20), legend.title = element_text(size=22)) +
   coord_fixed()
 
-# nh_graph_pl + ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_graph.pdf", height = 7, width = 8)
-# ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_graph.pdf", height = 7, width = 8)
+fn_nh_graph <- file.path(OUTPUT_DIR,"/liver_v2/liver_graph_new.pdf")
 
-ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_graph_new.pdf", height = 7, width = 8)
+if(OVERWRITE | !file.exists(fn_nh_graph)) {
+  ggsave(fn_nh_graph, height = 7, width = 8)
+} else {
+  message(cat(fn_nh_graph,"exists and will not be overwritten\n"))
+}
 
 ```
 
@@ -307,7 +324,7 @@ milo_res$annotation_lineage[milo_res$annotation_indepth_fraction < 0.6] <- NA
 ```
 
 
-I can recover all the clusters where DA was detected in the original paper
+We can recover all the clusters where DA was detected in the original paper
 
 ```{r, fig.width=10, fig.height=10, warning=FALSE, message=FALSE}
 group.by = "annotation_indepth"
@@ -379,11 +396,19 @@ pl2 <- milo_res %>%
 fig4_bleft <- (pl2 + pl1 +
   plot_layout(widths=c(1,10), guides = "collect") & theme(legend.position = 'top', legend.justification = 0))
 
+fn_liver_DAcomp <- file.path(OUTPUT_DIR,"/liver_v2/liver_DAcomparison.pdf")
+
+if(OVERWRITE | !file.exists(fn_liver_DAcomp)) {
+  ggsave(fn_liver_DAcomp, height = 13, width = 8)
+} else {
+  message(cat(fn_liver_DAcomp,"exists and will not be overwritten\n"))
+}
 # ggsave("~/mount/gdrive/milo/Figures/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
 # ggsave("~/dropbox-vu/temp/milo_output/liver_v2/liver_DAcomparison.pdf", width=8, height = 13)
 ```
-```{r fig.width=10, fig.height=10}
-pl2
+
+```{r fig.width=8, fig.height=13}
+fig4_bleft
 ```
 
 
@@ -426,20 +451,6 @@ endo_gr <-
   )  +
    theme(legend.text = element_text(size=20), legend.title = element_text(size=22))
   
-# liver_milo2 <- liver_milo
-# subset.nhoods <- str_detect(milo_res$annotation_indepth, "Endo")
-# reducedDim(liver_milo2, "UMAP")[colnames(endo_milo),] <- reducedDim(endo_milo, "UMAP") 
-# endo_gr_groups <- plotNhoodGroups(liver_milo2, milo_res_endogroups[milo_res_endogroups$annotation_lineage=="Endothelia",], 
-#                 show_groups = c("54", "70"),
-#                 size_range=c(1,4),
-#                 subset.nhoods = milo_res_endogroups$annotation_lineage=="Endothelia") +
-#   scale_fill_manual(values=c("54"=brewer.pal(4, "Spectral")[2], "70"=brewer.pal(4, "Spectral")[3]), 
-#                     labels=c("54"="Uninjured group", '70'= "Cirrhotic group"),
-#                     na.value="white",
-#                     name = "Nhood group"
-#                     ) +
-#   theme(legend.text = element_text(size=20), legend.title = element_text(size=22))
-
 fig4_bright1 <- ((endo_umap + endo_gr ) + 
   plot_layout(widths = c(1,2), 
                 guides = "collect"
@@ -447,17 +458,23 @@ fig4_bright1 <- ((endo_umap + endo_gr ) +
 fig4_bright1
 ```
 
-<!-- ```{r} -->
-<!-- nh_graph <- nhoodGraph(liver_milo)[subset.nhoods,subset.nhoods] -->
-<!-- nh_graph <- graph_from_adjacency_matrix(nh_graph) -->
 
-<!-- col_vals <- colData(liver_milo)[as.numeric(vertex_attr(nh_graph)$name), colour_by] -->
-<!-- V(nh_graph)$colour_by <- ifelse(milo_res[subset.nhoods,"SpatialFDR"] > 0.1, 0, milo_res[subset.nhoods,"logFC"]) -->
-<!-- ggraph(simplify(nh_graph)) + -->
-<!--       geom_edge_link0(edge_colour = "grey66", edge_alpha=0.2)   + -->
-<!--       geom_node_point(aes(fill = colour_by), shape=21, size=2) + -->
-<!--   scale_fill_gradient2() -->
-<!-- ``` -->
+### Can't get code below to run
+Unlcear what the problem is; data structure?
+```{r}
+# # nh_graph <- nhoodGraph(liver_milo)[subset.nhoods,subset.nhoods]
+# 
+# nh_graph <- nhoodGraph(liver_milo)[na.omit(subset.nhoods)]
+# 
+# nh_graph <- graph_from_adjacency_matrix(nh_graph)
+# 
+# col_vals <- colData(liver_milo)[as.numeric(vertex_attr(nh_graph)$name), colour_by]
+# V(nh_graph)$colour_by <- ifelse(milo_res[subset.nhoods,"SpatialFDR"] > 0.1, 0, milo_res[subset.nhoods,"logFC"])
+# ggraph(simplify(nh_graph)) +
+#       geom_edge_link0(edge_colour = "grey66", edge_alpha=0.2)   +
+#       geom_node_point(aes(fill = colour_by), shape=21, size=2) +
+#   scale_fill_gradient2()
+```
 
 
 ### Close-up on Cholangiocytes
@@ -525,54 +542,7 @@ chol_gr <-
 
 ### Differential Gene Expression analysis
 
-In a subset of lineages, we want to test for differential expression between neighbourhoods enriched in cirrhotic cells and neighbourhoods enriched
-
-<!-- (Now coded in `miloR\R\testDiffExp.R`) -->
-
-<!-- ```{r} -->
-<!-- .perform_counts_dge <- function(exprs.data, test.model, gene.offset=gene.offset, -->
-<!--                                 model.contrasts=NULL, n.coef=NULL){ -->
-
-<!--     i.dge <- DGEList(counts=exprs.data, -->
-<!--                      lib.size=log(colSums(exprs.data))) -->
-
-<!--     if(isTRUE(gene.offset)){ -->
-<!--         n.gene <- apply(exprs.data, 2, function(X) sum(X > 0)) -->
-<!--         if(ncol(test.model) == 2){ -->
-<!--             test.model <- cbind(test.model, n.gene) -->
-<!--             colnames(test.model) <- c(colnames(test.model)[1:2], "NGenes") -->
-<!--         } else if (ncol(test.model) > 2){ -->
-<!--             test.model <- cbind(test.model[, 1], n.gene, test.model[, c(2:ncol(test.model))]) -->
-<!--             colnames(test.model) <- c(colnames(test.model)[1], "NGenes", colnames(test.model[, c(2:ncol(test.model))])) -->
-<!--         } else{ -->
-<!--             if(ncol(test.model) < 2){ -->
-<!--                 warning("Only one column in model matrix - must have at least 2. gene.offset forced to  FALSE") -->
-<!--             } -->
-<!--         } -->
-<!--     } -->
-
-<!--     i.dge <- estimateDisp(i.dge, test.model) -->
-<!--     i.fit <- glmQLFit(i.dge, test.model, robust=TRUE) -->
-
-<!--     if(!is.null(model.contrasts)){ -->
-<!--         mod.constrast <- makeContrasts(contrasts=model.contrasts, levels=test.model) -->
-<!--         i.res <- as.data.frame(topTags(glmQLFTest(i.fit, contrast=mod.constrast), -->
-<!--                                        sort.by='none', n=Inf)) -->
-<!--     } else{ -->
-<!--         if(is.null(n.coef)){ -->
-<!--             n.coef <- ncol(test.model) -->
-<!--         } -->
-<!--         i.res <- as.data.frame(topTags(glmQLFTest(i.fit, coef=n.coef), sort.by='none', n=Inf)) -->
-<!--     } -->
-<!--     return(i.res) -->
-<!-- } -->
-
-<!-- ``` -->
-
-## NOTE: Code below here won't work unless `hvgs` is defined
-### DRT: stopping run-through here
-Should be able to run everything above.
-----
+In a subset of lineages, we want to test for differential expression between neighbourhoods enriched in cirrhotic cells and neighbourhoods enriched.  
 
 Add nhood expression to speed-up plotting of heatmaps
 
@@ -580,6 +550,10 @@ Add nhood expression to speed-up plotting of heatmaps
 liver_milo <- calcNhoodExpression(liver_milo, assay = "logcounts", subset.row = hvgs)
 ```
 
+-----
+# DRT: stopping run-through here
+Should be able to run everything above.
+-----
 
 ## Endothelia
 
