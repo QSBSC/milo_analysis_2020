@@ -65,7 +65,7 @@ OVERWRITE <- FALSE
 
 ## Load data
 
-We downloaded the dataset and annotations stored in Seurat object from [here](https://datashare.is.ed.ac.uk/handle/10283/3433), as indicated by the authors.
+We downloaded the dataset and annotations stored in Seurat object from [here](https://datashare.is.ed.ac.uk/handle/10283/3433), as indicated by the authors. The files are on DropBox and can be accessed directly with the code below.
 
 ```{r}
 # load("/nfs/team205/ed6/data/Ramachandran2019_liver/tissue.rdata")
@@ -189,7 +189,9 @@ pval_hist + volcano
 
 The distribution of P-values looks sensible and from the volcano plot we can see that we have identified some DA neighbourhoods at 10% FDR.
 
-We can visualize DA neighbourhoods building an abstracted graph
+We can visualize DA neighbourhoods building an abstracted graph.  
+
+**NOTE: This takes a while to process! Can take >30 min.**
 
 ```{r, fig.width=14, fig.height=10}
 liver_milo <- buildNhoodGraph(liver_milo)
