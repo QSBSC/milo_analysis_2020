@@ -35,6 +35,7 @@ installing from source (compiling on your computer, rather than installing from 
 See this link: https://github.com/bwlewis/irlba/issues/70
 
 ```{r}
+# install.packages("babelgene", type = "source")
 # install.packages("irlba", type = "source")
 # install.packages("Matrix", type = "source") # , version="1.6.1"
 ```
